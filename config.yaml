@@ -1,0 +1,33 @@
+connections:
+  - id: "dev_mysql2pg"
+    source:
+      type: "mysql"
+      host: "db-source.com"
+      port: 3306
+      user: "admin"
+      password: "pass123"
+      database: "source_db"
+    target:
+      type: "postgresql"
+      host: "db-target.com"
+      port: 5432
+      user: "pgadmin"
+      password: "pgpass456"
+      database: "target_db"
+      schema: "public"
+  
+  - id: "prod_sync"
+    source:
+      type: "sqlserver"
+      host: "mssql-server"
+      port: 1433
+      user: "sa"
+      password: "mssqlpass"
+      database: "production_db"
+    target:
+      type: "mysql"
+      host: "backup-db"
+      port: 3306
+      user: "backup_user"
+      password: "backup_pass"
+      database: "backup_db"

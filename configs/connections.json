@@ -1,0 +1,64 @@
+{
+  "connections": [
+    {
+      "id": "dev_mysql",
+      "source": {
+        "dialect": "mysql",
+        "host": "127.0.0.1",
+        "port": 3306,
+        "user": "root",
+        "password": "123456",
+        "database": "c1"
+      },
+      "target": {
+        "dialect": "mysql",
+        "host": "127.0.0.1",
+        "port": 3306,
+        "user": "root",
+        "password": "123456",
+        "database": "c2"
+      },
+      "exclude_tables": []
+    },
+    {
+      "id": "prod_postgres",
+      "source": {
+        "dialect": "postgresql",
+        "host": "prod-db.example.com",
+        "port": 5432,
+        "user": "prod_user",
+        "password": "prod_pass",
+        "database": "production_db"
+      },
+      "target": {
+        "dialect": "postgresql",
+        "host": "backup-db.example.com",
+        "port": 5432,
+        "user": "backup_user",
+        "password": "backup_pass",
+        "database": "backup_db"
+      }
+    },
+    {
+      "id": "222",
+      "source": {
+        "dialect": "mysql",
+        "host": "",
+        "port": 3306,
+        "database": "",
+        "user": "",
+        "password": "",
+        "type": "mysql"
+      },
+      "target": {
+        "dialect": "mysql",
+        "host": "",
+        "port": null,
+        "database": "",
+        "user": "",
+        "password": "",
+        "type": null
+      }
+    }
+  ]
+}

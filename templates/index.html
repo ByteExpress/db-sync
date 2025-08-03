@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database Sync Tool</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #4e73df;
+            --secondary-color: #6c757d;
+            --success-color: #1cc88a;
+            --info-color: #36b9cc;
+            --warning-color: #f6c23e;
+            --danger-color: #e74a3b;
+            --light-color: #f8f9fc;
+            --dark-color: #5a5c69;
+        }
+        
+        body {
+            background-color: #f8f9fc;
+            font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        
+        .navbar {
+            box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+        }
+        
+        .connection-card {
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+            border: none;
+            border-radius: 0.5rem;
+            overflow: hidden;
+            box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.1);
+            height: 100%;
+        }
+        
+        .connection-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.15);
+        }
+        
+        .connection-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 1.25rem;
+            background: linear-gradient(120deg, var(--primary-color), #2a4cb4);
+            color: white;
+        }
+        
+        .connection-id {
+            font-weight: 700;
+            font-size: 1.2rem;
+        }
+        
+        .connection-info {
+            font-size: 0.9rem;
+            color: #6c757d;
+            padding: 1.25rem;
+        }
+        
+        .connection-badge {
+            font-size: 0.8rem;
+            background-color: rgba(255, 255, 255, 0.2);
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+        }
+        
+        .add-connection-btn {
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            color: #6c757d;
+            border: 2px dashed #dee2e6;
+            border-radius: 0.5rem;
+            transition: all 0.3s;
+            background-color: #fff;
+        }
+        
+        .add-connection-btn:hover {
+            color: var(--primary-color);
+            border-color: var(--primary-color);
+            background-color: rgba(78, 115, 223, 0.05);
+        }
+        
+        .config-actions {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            z-index: 10;
+        }
+        
+        .card-footer {
+            background-color: #f8f9fc;
+            border-top: 1px solid #e3e6f0;
+            padding: 0.75rem 1.25rem;
+            font-size: 0.85rem;
+            color: #6c757d;
+        }
+        
+        .action-btn {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            background-color: rgba(255, 255, 255, 0.9);
+            box-shadow: 0 0.15rem 0.5rem rgba(0, 0, 0, 0.1);
+        }
+        
+        .source-indicator {
+            color: var(--success-color);
+        }
+        
+        .target-indicator {
+            color: var(--primary-color);
+        }
+        
+        .modal-content {
+            border-radius: 0.5rem;
+            box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.2);
+            border: none;
+        }
+        
+        .form-control:focus, .form-select:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 0.2rem rgba(78, 115, 223, 0.25);
+        }
+        
+        .btn-primary {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+        
+        .btn-primary:hover {
+            background-color: #2a4cb4;
+            border-color: #2a4cb4;
+        }
+        
+        .section-title {
+            position: relative;
+            padding-bottom: 0.75rem;
+            margin-bottom: 1.5rem;
+            font-weight: 600;
+        }
+        
+        .section-title::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 60px;
+            height: 3px;
+            background-color: var(--primary-color);
+            border-radius: 3px;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-connected {
+            background-color: var(--success-color);
+        }
+        
+        .status-disconnected {
+            background-color: var(--danger-color);
+        }
+        
+        .connection-stats {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+            font-size: 0.8rem;
+        }
+        
+        .stat-item {
+            text-align: center;
+            flex: 1;
+            padding: 0 5px;
+        }
+        
+        .stat-value {
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: var(--dark-color);
+        }
+        
+        .stat-label {
+            color: var(--secondary-color);
+            font-size: 0.75rem;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-database me-2"></i>Database Sync Tool
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#configModal">
+                            <i class="fas fa-cog me-1"></i>Manage Configs
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#">
+                            <i class="fas fa-history me-1"></i>Sync History
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#">
+                            <i class="fas fa-question-circle me-1"></i>Help
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container my-5">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1 class="h3 mb-1">Database Connections</h1>
+                <p class="text-muted mb-0">Select a connection to compare and synchronize databases</p>
+            </div>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#connectionModal" id="addConnectionBtn">
+                <i class="fas fa-plus me-1"></i>Add Connection
+            </button>
+        </div>
+
+        <div class="alert alert-info d-flex align-items-center">
+            <i class="fas fa-info-circle me-3 fa-2x"></i>
+            <div>
+                <h5 class="alert-heading">Getting Started</h5>
+                <p class="mb-0">Add your first database connection to start comparing and synchronizing database schemas.</p>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            {% for conn in connections %}
+            <div class="col-md-6 col-lg-4">
+                <div class="card connection-card" onclick="window.location.href='/compare/{{ conn.id }}'">
+                    <div class="connection-header">
+                        <div>
+                            <div class="connection-id">{{ conn.id }}</div>
+                            <div class="d-flex align-items-center mt-1">
+                                <span class="status-indicator status-connected"></span>
+                                <small>Active</small>
+                            </div>
+                        </div>
+                        <span class="connection-badge">{{ conn.source.type|upper }} → {{ conn.target.type|upper }}</span>
+                    </div>
+                    
+                    <div class="connection-info">
+                        <div class="mb-3">
+                            <div class="d-flex align-items-center mb-2">
+                                <i class="fas fa-arrow-right source-indicator me-2"></i>
+                                <strong>Source</strong>
+                            </div>
+                            <div class="ms-4">
+                                <div>{{ conn.source.database }}@{{ conn.source.host }}</div>
+                                <small class="text-muted">{{ conn.source.user }} • Port: {{ conn.source.port }}</small>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <div class="d-flex align-items-center mb-2">
+                                <i class="fas fa-arrow-left target-indicator me-2"></i>
+                                <strong>Target</strong>
+                            </div>
+                            <div class="ms-4">
+                                <div>{{ conn.target.database }}@{{ conn.target.host }}</div>
+                                <small class="text-muted">{{ conn.target.user }} • Port: {{ conn.target.port }}</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card-footer d-flex justify-content-between">
+                        <div>
+                            <i class="fas fa-clock me-1"></i>
+                            <small>Last sync: 2 days ago</small>
+                        </div>
+                        <div>
+                            <i class="fas fa-table me-1"></i>
+                            <small>12 tables</small>
+                        </div>
+                    </div>
+                    
+                    <div class="config-actions">
+                        <button class="btn btn-sm action-btn" 
+                                data-bs-toggle="tooltip" 
+                                title="Edit Connection"
+                                onclick="event.stopPropagation(); openEditModal('{{ conn.id }}')">
+                            <i class="fas fa-edit text-primary"></i>
+                        </button>
+                        <button class="btn btn-sm action-btn" 
+                                data-bs-toggle="tooltip" 
+                                title="Manage Excluded Tables"
+                                onclick="event.stopPropagation(); openExcludeTablesModal('{{ conn.id }}')">
+                            <i class="fas fa-ban text-danger"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+            
+            <div class="col-md-6 col-lg-4">
+                <div class="card h-100">
+                    <div class="card-body add-connection-btn p-5" data-bs-toggle="modal" data-bs-target="#connectionModal">
+                        <i class="fas fa-plus-circle fa-3x mb-3 text-primary"></i>
+                        <h5 class="card-title">Add New Connection</h5>
+                        <p class="card-text small text-muted">Configure a new database pair to compare</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Connection Modal (Add/Edit) -->
+    <div class="modal fade" id="connectionModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalTitle">Add New Connection</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="connectionForm">
+                        <input type="hidden" id="editMode" value="add">
+                        <input type="hidden" id="originalId" value="">
+                        
+                        <div class="mb-4">
+                            <label class="form-label">Connection ID <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="connectionId" name="id" required>
+                            <div class="form-text">Unique identifier for this connection</div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h5 class="section-title">Source Database</h5>
+                                <div class="mb-3">
+                                    <label class="form-label">Database Type <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="sourceType" name="source_type" required>
+                                        <option value="">Select database type</option>
+                                        <option value="mysql">MySQL</option>
+                                        <option value="postgresql">PostgreSQL</option>
+                                        <option value="sqlite">SQLite</option>
+                                        <option value="mssql">SQL Server</option>
+                                        <option value="oracle">Oracle</option>
+                                    </select>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-md-8">
+                                        <label class="form-label">Host <span class="text-danger">*</span></label>
+                                        <input type="text" class="form-control" id="sourceHost" name="source_host" required>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">Port <span class="text-danger">*</span></label>
+                                        <input type="number" class="form-control" id="sourcePort" name="source_port" required>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Database Name <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="sourceDatabase" name="source_database" required>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Username <span class="text-danger">*</span></label>
+                                        <input type="text" class="form-control" id="sourceUser" name="source_user" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Password <span class="text-danger">*</span></label>
+                                        <input type="password" class="form-control" id="sourcePassword" name="source_password" required>
+                                    </div>
+                                </div>
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="sourceTestConnection">
+                                    <label class="form-check-label" for="sourceTestConnection">
+                                        Test connection
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <h5 class="section-title">Target Database</h5>
+                                <div class="mb-3">
+                                    <label class="form-label">Database Type <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="targetType" name="target_type" required>
+                                        <option value="">Select database type</option>
+                                        <option value="mysql">MySQL</option>
+                                        <option value="postgresql">PostgreSQL</option>
+                                        <option value="sqlite">SQLite</option>
+                                        <option value="mssql">SQL Server</option>
+                                        <option value="oracle">Oracle</option>
+                                    </select>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-md-8">
+                                        <label class="form-label">Host <span class="text-danger">*</span></label>
+                                        <input type="text" class="form-control" id="targetHost" name="target_host" required>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">Port <span class="text-danger">*</span></label>
+                                        <input type="number" class="form-control" id="targetPort" name="target_port" required>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Database Name <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="targetDatabase" name="target_database" required>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Username <span class="text-danger">*</span></label>
+                                        <input type="text" class="form-control" id="targetUser" name="target_user" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Password <span class="text-danger">*</span></label>
+                                        <input type="password" class="form-control" id="targetPassword" name="target_password" required>
+                                    </div>
+                                </div>
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="targetTestConnection">
+                                    <label class="form-check-label" for="targetTestConnection">
+                                        Test connection
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="savePassword">
+                            <label class="form-check-label" for="savePassword">
+                                Save passwords (not recommended for production)
+                            </label>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="saveConnectionBtn">
+                        <i class="fas fa-save me-1"></i>Save Connection
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 排除表管理模态框 -->
+    <div class="modal fade" id="excludeTablesModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Manage Excluded Tables</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Connection</label>
+                        <input type="text" class="form-control" id="excludeConnId" readonly>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Tables to Exclude</label>
+                        <div id="excludeTablesList" class="mb-2" style="max-height: 200px; overflow-y: auto;">
+                            <!-- 排除表列表将在这里动态生成 -->
+                        </div>
+                        
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="newExcludeTable" 
+                                placeholder="Enter table name or pattern (e.g. temp_*)">
+                            <button class="btn btn-outline-primary" type="button" id="addExcludeTableBtn">
+                                <i class="fas fa-plus"></i> Add
+                            </button>
+                        </div>
+                        <div class="form-text">
+                            Use * as wildcard to exclude multiple tables (e.g. backup_*)
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="saveExcludeTablesBtn">
+                        <i class="fas fa-save me-1"></i>Save
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Config Management Modal -->
+    <div class="modal fade" id="configModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Configuration Management</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Config File Path</label>
+                        <input type="text" class="form-control" value="config/connections.yaml" readonly>
+                    </div>
+                    <div class="d-grid gap-2 mb-3">
+                        <button class="btn btn-outline-primary">
+                            <i class="fas fa-file-export me-2"></i>Export Configuration
+                        </button>
+                        <button class="btn btn-outline-primary">
+                            <i class="fas fa-file-import me-2"></i>Import Configuration
+                        </button>
+                    </div>
+                    <div class="d-grid">
+                        <button class="btn btn-outline-danger">
+                            <i class="fas fa-trash-alt me-2"></i>Clear All Configurations
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="footer mt-auto py-4 bg-light border-top">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-lg-6 text-center text-lg-start">
+                    <span class="text-muted">Database Sync Tool v1.0.0</span>
+                </div>
+                <div class="col-lg-6 text-center text-lg-end">
+                    <span class="text-muted">
+                        <i class="fas fa-code me-1"></i> 
+                        Made with Flask & SQLAlchemy
+                    </span>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 初始化工具提示
+        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+        tooltipTriggerList.map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl))
+        
+        // 存储连接数据
+        const connectionsData = {
+            {% for conn in connections %}
+                "{{ conn.id }}": {{ conn|tojson }},
+            {% endfor %}
+        };
+        
+        // 打开编辑模态框
+        function openEditModal(connId) {
+            const connData = connectionsData[connId];
+            if (!connData) {
+                alert('Connection data not found!');
+                return;
+            }
+            
+            // 设置模态框为编辑模式
+            document.getElementById('modalTitle').textContent = 'Edit Connection';
+            document.getElementById('editMode').value = 'edit';
+            document.getElementById('originalId').value = connId;
+            
+            // 填充表单数据
+            document.getElementById('connectionId').value = connId;
+            document.getElementById('connectionId').readOnly = true;
+            
+            // 填充源数据库
+            document.getElementById('sourceType').value = connData.source.type;
+            document.getElementById('sourceHost').value = connData.source.host;
+            document.getElementById('sourcePort').value = connData.source.port;
+            document.getElementById('sourceDatabase').value = connData.source.database;
+            document.getElementById('sourceUser').value = connData.source.user;
+            
+            // 填充目标数据库
+            document.getElementById('targetType').value = connData.target.type;
+            document.getElementById('targetHost').value = connData.target.host;
+            document.getElementById('targetPort').value = connData.target.port;
+            document.getElementById('targetDatabase').value = connData.target.database;
+            document.getElementById('targetUser').value = connData.target.user;
+            
+            // 显示模态框
+            const modal = new bootstrap.Modal(document.getElementById('connectionModal'));
+            modal.show();
+        }
+
+        // 存储当前连接的排除表配置
+        let currentExcludeTables = [];
+
+        // 打开排除表管理模态框
+        function openExcludeTablesModal(connId) {
+            const connData = connectionsData[connId];
+            if (!connData) {
+                alert('Connection data not found!');
+                return;
+            }
+            
+            // 设置连接ID
+            document.getElementById('excludeConnId').value = connId;
+            
+            // 加载排除表配置
+            currentExcludeTables = connData.exclude_tables || [];
+            renderExcludeTablesList();
+            
+            // 显示模态框
+            const modal = new bootstrap.Modal(document.getElementById('excludeTablesModal'));
+            modal.show();
+        }
+
+        // 渲染排除表列表
+        function renderExcludeTablesList() {
+            const container = document.getElementById('excludeTablesList');
+            container.innerHTML = '';
+            
+            if (currentExcludeTables.length === 0) {
+                container.innerHTML = '<div class="alert alert-info">No tables excluded</div>';
+                return;
+            }
+            
+            const listGroup = document.createElement('div');
+            listGroup.className = 'list-group';
+            
+            currentExcludeTables.forEach((table, index) => {
+                const item = document.createElement('div');
+                item.className = 'list-group-item d-flex justify-content-between align-items-center';
+                
+                const tableName = document.createElement('span');
+                tableName.textContent = table;
+                
+                const actions = document.createElement('div');
+                
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'btn btn-sm btn-outline-danger';
+                deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
+                deleteBtn.onclick = () => removeExcludeTable(index);
+                
+                actions.appendChild(deleteBtn);
+                
+                item.appendChild(tableName);
+                item.appendChild(actions);
+                listGroup.appendChild(item);
+            });
+            
+            container.appendChild(listGroup);
+        }
+
+        // 添加排除表
+        document.getElementById('addExcludeTableBtn').addEventListener('click', function() {
+            const input = document.getElementById('newExcludeTable');
+            const tablePattern = input.value.trim();
+            
+            if (!tablePattern) {
+                alert('Please enter a table name or pattern');
+                return;
+            }
+            
+            // 检查是否已存在
+            if (!currentExcludeTables.includes(tablePattern)) {
+                currentExcludeTables.push(tablePattern);
+                renderExcludeTablesList();
+                input.value = '';
+            } else {
+                alert('This table pattern is already in the exclusion list');
+            }
+        });
+
+        // 移除排除表
+        function removeExcludeTable(index) {
+            currentExcludeTables.splice(index, 1);
+            renderExcludeTablesList();
+        }
+
+        // 保存排除表配置
+        document.getElementById('saveExcludeTablesBtn').addEventListener('click', function() {
+            const connId = document.getElementById('excludeConnId').value;
+            
+            fetch('/update_exclude_tables', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    conn_id: connId,
+                    exclude_tables: currentExcludeTables
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // 更新本地数据
+                    if (connectionsData[connId]) {
+                        connectionsData[connId].exclude_tables = [...currentExcludeTables];
+                    }
+                    
+                    // 关闭模态框
+                    bootstrap.Modal.getInstance(document.getElementById('excludeTablesModal')).hide();
+                    
+                    // 显示成功消息
+                    alert('Exclusion list updated successfully');
+                } else {
+                    alert('Error saving exclusion list: ' + data.message);
+                }
+            })
+            .catch(error => {
+                alert('Error: ' + error.message);
+            });
+        });
+        
+        // 保存连接
+        document.getElementById('saveConnectionBtn').addEventListener('click', function() {
+            const form = document.getElementById('connectionForm');
+            const formData = new FormData(form);
+            const isEdit = document.getElementById('editMode').value === 'edit';
+            const originalId = document.getElementById('originalId').value;
+            
+            const connectionData = {
+                id: formData.get('id'),
+                source: {
+                    type: formData.get('source_type'),
+                    host: formData.get('source_host'),
+                    port: parseInt(formData.get('source_port')),
+                    database: formData.get('source_database'),
+                    user: formData.get('source_user'),
+                    password: formData.get('source_password')
+                },
+                target: {
+                    type: formData.get('target_type'),
+                    host: formData.get('target_host'),
+                    port: parseInt(formData.get('target_port')),
+                    database: formData.get('target_database'),
+                    user: formData.get('target_user'),
+                    password: formData.get('target_password')
+                }
+            };
+            
+            let url, method;
+            if (isEdit) {
+                url = '/update_connection';
+                method = 'PUT';
+                connectionData.original_id = originalId;
+            } else {
+                url = '/save_connection';
+                method = 'POST';
+            }
+            
+            // 发送到后端保存
+            fetch(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(connectionData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // 关闭模态框并刷新页面
+                    bootstrap.Modal.getInstance(document.getElementById('connectionModal')).hide();
+                    location.reload();
+                } else {
+                    alert('Error saving connection: ' + data.message);
+                }
+            })
+            .catch(error => {
+                alert('Error: ' + error.message);
+            });
+        });
+        
+        // 重置模态框当关闭时
+        document.getElementById('connectionModal').addEventListener('hidden.bs.modal', function() {
+            document.getElementById('connectionForm').reset();
+            document.getElementById('editMode').value = 'add';
+            document.getElementById('originalId').value = '';
+            document.getElementById('modalTitle').textContent = 'Add New Connection';
+            document.getElementById('connectionId').readOnly = false;
+        });
+        
+        // 为数据库类型设置默认端口
+        function setDefaultPort(type, elementPrefix) {
+            const portMap = {
+                'mysql': 3306,
+                'postgresql': 5432,
+                'sqlite': 0,
+                'mssql': 1433,
+                'oracle': 1521
+            };
+            
+            const portElement = document.getElementById(`${elementPrefix}Port`);
+            if (portMap[type] !== undefined) {
+                portElement.value = portMap[type];
+            }
+        }
+        
+        // 监听数据库类型变化
+        document.getElementById('sourceType').addEventListener('change', function() {
+            setDefaultPort(this.value, 'source');
+        });
+        
+        document.getElementById('targetType').addEventListener('change', function() {
+            setDefaultPort(this.value, 'target');
+        });
+        
+        // 初始化页面
+        document.addEventListener('DOMContentLoaded', function() {
+            // 设置默认端口
+            setDefaultPort('mysql', 'source');
+            setDefaultPort('mysql', 'target');
+        });
+    </script>
+</body>
+</html>
