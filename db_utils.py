@@ -42,112 +42,140 @@ def get_engine(conn_config):
 def get_table_metadata(engine):
     """获取数据库表的元数据"""
     try:
-        inspector = inspect(engine)
         metadata = {}
+        inspector = inspect(engine)
         
         for table_name in inspector.get_table_names():
-            columns = {}
-            for col in inspector.get_columns(table_name):
-                columns[col['name']] = {
-                    "type": str(col['type']),
-                    "nullable": col['nullable'],
-                    "default": col.get('default', None)
-                }
+            # 获取表注释
+            try:
+                table_comment = inspector.get_table_comment(table_name).get('text', '')
+            except Exception:
+                table_comment = ''
             
             # 获取主键信息
-            try:
-                pk_info = inspector.get_pk_constraint(table_name)
-                metadata[table_name] = {
-                    "columns": columns,
-                    "primary_key": pk_info.get('constrained_columns', [])
-                }
-            except exc.NoSuchTableError:
-                logger.warning(f"表 {table_name} 不存在或无法访问")
-                continue
+            primary_key = inspector.get_pk_constraint(table_name)['constrained_columns']
+            
+            # 获取列信息
+            columns = {}
+            for col in inspector.get_columns(table_name):
+                # 获取列注释
+                col_comment = col.get('comment', '')
+                if not col_comment and 'comment' in col:
+                    col_comment = col['comment']
                 
+                # 处理默认值
+                default = col.get('default')
+                if callable(default):
+                    default = None
+                
+                columns[col['name']] = {
+                    'type': str(col['type']),
+                    'nullable': col['nullable'],
+                    'default': default,
+                    'comment': col_comment
+                }
+            
+            # 存储表元数据
+            metadata[table_name] = {
+                'columns': columns,
+                'primary_key': primary_key,
+                'comment': table_comment
+            }
+        
         return metadata
     except exc.SQLAlchemyError as e:
         logger.error(f"获取表元数据失败: {e}")
         return {}
 
-def compare_metadata111(src_meta, tgt_meta):
-    """比较源数据库和目标数据库的元数据差异"""
-    diff = {"tables": {}, "columns": {}}
-    
-    # 表级差异
-    for table in src_meta:
-        if table not in tgt_meta:
-            diff["tables"][table] = "MISSING"
-            continue
-            
-        # 列级差异
-        col_diff = {}
-        for col, col_meta in src_meta[table]["columns"].items():
-            if col not in tgt_meta[table]["columns"]:
-                col_diff[col] = "MISSING"
-            elif col_meta != tgt_meta[table]["columns"][col]:
-                col_diff[col] = "DIFFERENT"
-        
-        if col_diff:
-            diff["columns"][table] = col_diff
-    
-    # 检查目标数据库多余的表
-    for table in tgt_meta:
-        if table not in src_meta:
-            diff["tables"][table] = "EXTRA"
-    
-    return diff
-
 def compare_metadata(src_meta, tgt_meta):
     """比较源数据库和目标数据库的元数据差异，返回详细差异信息"""
     diff = {
         "tables": {
-            "missing": [],    # 目标库缺失的表
-            "extra": [],      # 目标库多余的表
-            "changed": []     # 表结构有变化的表
+            "missing": [],  # 目标库缺失的表
+            "extra": [],    # 目标库多余的表
+            "changed": []   # 表结构有变化的表
         },
-        "columns": {}
+        "columns": {}       # 表内列的差异
     }
     
-    # 检测表级差异
+    # 比较表
     src_tables = set(src_meta.keys())
     tgt_tables = set(tgt_meta.keys())
     
-    diff["tables"]["missing"] = list(src_tables - tgt_tables)  # 目标库缺失的表
-    diff["tables"]["extra"] = list(tgt_tables - src_tables)    # 目标库多余的表
+    diff["tables"]["missing"] = list(src_tables - tgt_tables)
+    diff["tables"]["extra"] = list(tgt_tables - src_tables)
     
-    # 检测列级差异
-    for table in src_tables & tgt_tables:  # 两边都存在的表
-        col_diff = {
-            "missing": [],      # 目标表缺失的列
-            "extra": [],        # 目标表多余的列
-            "changed": {}       # 列定义有变化的列
-        }
+    # 比较共有表的结构差异
+    common_tables = src_tables & tgt_tables
+    for table in common_tables:
+        # 检查表注释是否相同
+        src_comment = src_meta[table].get("comment", "")
+        tgt_comment = tgt_meta[table].get("comment", "")
+        comment_changed = src_comment != tgt_comment
         
+        # 比较列
         src_cols = src_meta[table]["columns"]
         tgt_cols = tgt_meta[table]["columns"]
         
-        for col_name, src_def in src_cols.items():
-            if col_name not in tgt_cols:
-                col_diff["missing"].append(col_name)
-            else:
-                tgt_def = tgt_cols[col_name]
-                # 检查列定义是否相同
-                if (src_def["type"] != tgt_def["type"] or 
-                    src_def["nullable"] != tgt_def["nullable"] or
-                    src_def.get("default") != tgt_def.get("default")):
-                    col_diff["changed"][col_name] = {
-                        "src": src_def,
-                        "tgt": tgt_def
-                    }
+        col_diff = {
+            "missing": [],  # 目标库缺失的列
+            "extra": [],    # 目标库多余的列
+            "changed": {}   # 列定义有变化的列
+        }
         
-        # 检查目标表多余的列
-        for col_name in tgt_cols.keys():
-            if col_name not in src_cols:
-                col_diff["extra"].append(col_name)
+        # 比较列差异
+        src_col_names = set(src_cols.keys())
+        tgt_col_names = set(tgt_cols.keys())
         
-        # 如果表有列差异，则标记为changed表
-        if col_diff["missing"] or col_diff["extra"] or col_diff["changed"]:
+        col_diff["missing"] = list(src_col_names - tgt_col_names)
+        col_diff["extra"] = list(tgt_col_names - src_col_names)
+        
+        # 比较共有列的差异
+        common_cols = src_col_names & tgt_col_names
+        for col in common_cols:
+            src_def = src_cols[col]
+            tgt_def = tgt_cols[col]
+            
+            changes = {}
+            
+            # 比较类型
+            if src_def["type"] != tgt_def["type"]:
+                changes["type"] = {
+                    "src": src_def["type"],
+                    "tgt": tgt_def["type"]
+                }
+            
+            # 比较是否可为空
+            if src_def["nullable"] != tgt_def["nullable"]:
+                changes["nullable"] = {
+                    "src": src_def["nullable"],
+                    "tgt": tgt_def["nullable"]
+                }
+            
+            # 比较默认值
+            if src_def["default"] != tgt_def["default"]:
+                changes["default"] = {
+                    "src": src_def["default"],
+                    "tgt": tgt_def["default"]
+                }
+            
+            # 比较注释
+            if src_def.get("comment") != tgt_def.get("comment"):
+                changes["comment"] = {
+                    "src": src_def.get("comment", ""),
+                    "tgt": tgt_def.get("comment", "")
+                }
+            
+            # 如果有任何变化，记录差异
+            if changes:
+                col_diff["changed"][col] = {
+                    "src": src_def,
+                    "tgt": tgt_def,
+                    "changes": changes
+                }
+        
+        # 如果有列差异或注释差异，标记表为已更改
+        if col_diff["missing"] or col_diff["extra"] or col_diff["changed"] or comment_changed:
             diff["tables"]["changed"].append(table)
             diff["columns"][table] = col_diff
     
