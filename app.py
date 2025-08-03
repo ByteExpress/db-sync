@@ -164,7 +164,7 @@ def compare(conn_id):
             # 检查表是否在排除列表中
             if should_exclude_table(table,exclude_tables):
                 continue
-            
+
             table_status = ""
             if table in diff["tables"]["extra"]:
                 table_status = "extra"
@@ -331,15 +331,18 @@ def update_connection():
             "success": False,
             "message": str(e)
         }), 500
-
-def generate_sync_script(conn_id, src_meta, tgt_meta, diff, selected_tables, selected_columns):
-    """生成精确的数据库同步脚本"""
+#111111
+def generate_sync_script(conn_id, src_meta, tgt_meta, diff, selected_tables, selected_columns,target_db_type):
+    """生成精确的数据库同步脚本（包含备注信息）"""
     script = f"-- 数据库同步脚本: {conn_id}\n"
     script += f"-- 生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
     script += f"-- 同步模式: 结构同步\n\n"
     
+    # 获取目标数据库类型（用于确定注释语法）
+    target_db_type = "mysql"  # 默认为MySQL，实际应从连接配置获取
+    
     # 生成表注释
-    script += f"-- 共选择 {len(selected_tables)} 个表进行同步\n"
+    script += f"-- 共选择 {len(selected_tables)} 个表进行同步\n\n"
     
     # 生成表级操作
     for table in selected_tables:
@@ -351,9 +354,15 @@ def generate_sync_script(conn_id, src_meta, tgt_meta, diff, selected_tables, sel
         src_cols = src_meta[table]["columns"]
         tgt_cols = tgt_meta[table]["columns"] if table in tgt_meta else {}
         
+        # 获取表注释
+        table_comment = src_meta[table].get("comment", "")
+        
         # 处理缺失的表（目标库不存在）
         if table in diff["tables"]["missing"]:
             script += f"\n-- 创建缺失的表: {table}\n"
+            if table_comment:
+                script += f"-- 表注释: {table_comment}\n"
+            
             script += f"CREATE TABLE {table} (\n"
             
             # 添加列定义
@@ -361,6 +370,8 @@ def generate_sync_script(conn_id, src_meta, tgt_meta, diff, selected_tables, sel
             for col, col_def in src_cols.items():
                 # 只添加选中的列
                 if col in selected_columns.get(table, []):
+                    col_comment = col_def.get("comment", "")
+                    
                     col_def_str = f"    {col} {col_def['type']}"
                     if not col_def["nullable"]:
                         col_def_str += " NOT NULL"
@@ -370,6 +381,11 @@ def generate_sync_script(conn_id, src_meta, tgt_meta, diff, selected_tables, sel
                         if isinstance(default_val, str) and not re.match(r"^'.*'$", default_val):
                             default_val = f"'{default_val}'"
                         col_def_str += f" DEFAULT {default_val}"
+                    
+                    # MySQL直接添加列注释
+                    if col_comment and target_db_type == "mysql":
+                        col_def_str += f" COMMENT '{col_comment}'"
+                    
                     col_definitions.append(col_def_str)
             
             script += ",\n".join(col_definitions)
@@ -380,17 +396,41 @@ def generate_sync_script(conn_id, src_meta, tgt_meta, diff, selected_tables, sel
                 script += f",\n    PRIMARY KEY ({pk_cols})"
             
             script += "\n);\n"
+            
+            # 添加表注释（非MySQL）
+            if table_comment and target_db_type != "mysql":
+                if target_db_type == "postgresql":
+                    script += f"COMMENT ON TABLE {table} IS '{table_comment}';\n"
+                elif target_db_type == "sqlserver":
+                    script += f"EXEC sp_addextendedproperty 'MS_Description', '{table_comment}', 'SCHEMA', 'dbo', 'TABLE', '{table}';\n"
+            
+            # 添加列注释（非MySQL）
+            if target_db_type != "mysql":
+                for col, col_def in src_cols.items():
+                    if col in selected_columns.get(table, []):
+                        col_comment = col_def.get("comment", "")
+                        if col_comment:
+                            if target_db_type == "postgresql":
+                                script += f"COMMENT ON COLUMN {table}.{col} IS '{col_comment}';\n"
+                            elif target_db_type == "sqlserver":
+                                script += f"EXEC sp_addextendedproperty 'MS_Description', '{col_comment}', 'SCHEMA', 'dbo', 'TABLE', '{table}', 'COLUMN', '{col}';\n"
+            
+            script += "\n"
         
         # 处理已有表的结构变更
         elif table in diff["tables"]["changed"]:
             table_diff = diff["columns"][table]
             script += f"\n-- 同步表结构变更: {table}\n"
+            if table_comment:
+                script += f"-- 表注释: {table_comment}\n"
             
             # 添加缺失的列
             for col in table_diff["missing"]:
                 # 只添加选中的列
                 if col in selected_columns.get(table, []):
                     col_def = src_cols[col]
+                    col_comment = col_def.get("comment", "")
+                    
                     col_def_str = f"ALTER TABLE {table} ADD COLUMN {col} {col_def['type']}"
                     if not col_def["nullable"]:
                         col_def_str += " NOT NULL"
@@ -399,13 +439,27 @@ def generate_sync_script(conn_id, src_meta, tgt_meta, diff, selected_tables, sel
                         if isinstance(default_val, str) and not re.match(r"^'.*'$", default_val):
                             default_val = f"'{default_val}'"
                         col_def_str += f" DEFAULT {default_val}"
+                    
+                    # MySQL直接添加列注释
+                    if col_comment and target_db_type == "mysql":
+                        col_def_str += f" COMMENT '{col_comment}'"
+                    
                     script += col_def_str + ";\n"
+                    
+                    # 非MySQL数据库添加列注释
+                    if col_comment and target_db_type != "mysql":
+                        if target_db_type == "postgresql":
+                            script += f"COMMENT ON COLUMN {table}.{col} IS '{col_comment}';\n"
+                        elif target_db_type == "sqlserver":
+                            script += f"EXEC sp_addextendedproperty 'MS_Description', '{col_comment}', 'SCHEMA', 'dbo', 'TABLE', '{table}', 'COLUMN', '{col}';\n"
             
             # 修改列定义
             for col, changes in table_diff["changed"].items():
                 # 只处理选中的列
                 if col in selected_columns.get(table, []):
                     src_def = changes["src"]
+                    col_comment = src_def.get("comment", "")
+                    
                     col_def_str = f"ALTER TABLE {table} MODIFY COLUMN {col} {src_def['type']}"
                     if not src_def["nullable"]:
                         col_def_str += " NOT NULL"
@@ -414,7 +468,20 @@ def generate_sync_script(conn_id, src_meta, tgt_meta, diff, selected_tables, sel
                         if isinstance(default_val, str) and not re.match(r"^'.*'$", default_val):
                             default_val = f"'{default_val}'"
                         col_def_str += f" DEFAULT {default_val}"
+                    
+                    # MySQL直接添加列注释
+                    if col_comment and target_db_type == "mysql":
+                        col_def_str += f" COMMENT '{col_comment}'"
+                    
                     script += col_def_str + ";\n"
+                    
+                    # 非MySQL数据库更新列注释
+                    if col_comment and target_db_type != "mysql":
+                        # 注意：PostgreSQL和SQL Server更新注释的语法与添加相同
+                        if target_db_type == "postgresql":
+                            script += f"COMMENT ON COLUMN {table}.{col} IS '{col_comment}';\n"
+                        elif target_db_type == "sqlserver":
+                            script += f"EXEC sp_addextendedproperty 'MS_Description', '{col_comment}', 'SCHEMA', 'dbo', 'TABLE', '{table}', 'COLUMN', '{col}';\n"
             
             # 删除多余的列（可选，默认不删除）
             # for col in table_diff["extra"]:
@@ -425,6 +492,10 @@ def generate_sync_script(conn_id, src_meta, tgt_meta, diff, selected_tables, sel
     if extra_tables:
         script += "\n-- 目标库多余的表（源库不存在）\n"
         for table in extra_tables:
+            # 添加表注释信息
+            tgt_comment = tgt_meta[table].get("comment", "") if table in tgt_meta else ""
+            if tgt_comment:
+                script += f"-- 表注释: {tgt_comment}\n"
             script += f"-- DROP TABLE {table};  -- 谨慎: 删除多余表\n"
     
     script += "\n-- 同步完成 --\n"
@@ -446,6 +517,9 @@ def generate_script():
         if not conn_config:
             return jsonify({"status": "error", "message": "无效的连接ID"}), 400
         
+        # 获取目标数据库类型
+        target_db_type = conn_config["target"].get("type", "mysql").lower()
+        
         # 获取元数据
         src_engine = get_engine(conn_config["source"])
         tgt_engine = get_engine(conn_config["target"])
@@ -456,14 +530,15 @@ def generate_script():
         # 计算差异
         diff = compare_metadata(src_meta, tgt_meta)
         
-        # 生成精确的同步脚本
+        # 生成精确的同步脚本（传递目标数据库类型）
         script = generate_sync_script(
             conn_id, 
             src_meta, 
             tgt_meta, 
             diff, 
             selected_tables, 
-            selected_columns
+            selected_columns,
+            target_db_type  # 添加目标数据库类型参数
         )
         
         # 保存到文件
